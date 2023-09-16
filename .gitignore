@@ -148,3 +148,6 @@ dmypy.json
 # папки со статикой и медиа
 media/
 yatube_api/posts/static/
+
+postman_collection/
+yatube_api/api/migrations/
