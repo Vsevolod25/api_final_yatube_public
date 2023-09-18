@@ -1,13 +1,19 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import exceptions, filters, viewsets
+from rest_framework import filters, mixins, viewsets
 from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny
 
 from .permissions import IsAuthenticatedOrAuthorOrReadOnly
 from .serializers import (
     CommentSerializer, FollowSerializer, GroupSerializer, PostSerializer
 )
-from posts.models import Follow, Group, Post, User
+from posts.models import Group, Post, User
+
+
+class CreateListViewSet(
+    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
+    pass
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -23,7 +29,7 @@ class PostViewSet(viewsets.ModelViewSet):
 class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
+    permission_classes = (AllowAny,)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -45,26 +51,16 @@ class CommentViewSet(viewsets.ModelViewSet):
         )
 
 
-class FollowViewSet(viewsets.ModelViewSet):
+class FollowViewSet(CreateListViewSet):
     serializer_class = FollowSerializer
-    http_method_names = ('get', 'post', 'head')
     filter_backends = (filters.SearchFilter,)
     search_fields = ('following__username',)
 
     def get_queryset(self):
-        return self.request.user.users
+        return self.request.user.follower
 
     def perform_create(self, serializer):
         following = get_object_or_404(
             User, username=self.request.data['following']
         )
-        if (
-            Follow.objects.filter(
-                user=self.request.user, following=following).exists()
-            or following == self.request.user
-        ):
-            raise exceptions.ValidationError
-        serializer.save(
-            user=self.request.user,
-            following=following
-        )
+        serializer.save(following=following)
